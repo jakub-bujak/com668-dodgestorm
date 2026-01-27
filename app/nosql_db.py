@@ -1,9 +1,44 @@
-from pymongo import MongoClient, ASCENDING, DESCENDING
-from .config import MONGO_URI, MONGO_DB_NAME, MONGO_LEADERBOARD_COLLECTION
+import uuid
+from typing import Any, Dict, List
 
-client = MongoClient(MONGO_URI)
-db = client[MONGO_DB_NAME]
-leaderboard = db[MONGO_LEADERBOARD_COLLECTION]
+from azure.cosmos import CosmosClient, PartitionKey
+from .config import COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DB_NAME, COSMOS_CONTAINER
 
-leaderboard.create_index([("score", DESCENDING), ("timestamp", ASCENDING)])
-leaderboard.create_index([("username", ASCENDING)])
+_client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
+
+_db = _client.create_database_if_not_exists(id=COSMOS_DB_NAME)
+
+_container = _db.create_container_if_not_exists(
+    id=COSMOS_CONTAINER,
+    partition_key=PartitionKey(path="/gameMode"),
+)
+
+def insert_score(doc: Dict[str, Any]) -> None:
+    doc = dict(doc)
+    doc.setdefault("id", str(uuid.uuid4()))
+    doc.setdefault("gameMode", "classic")
+    _container.create_item(body=doc)
+
+def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]]:
+    limit = max(1, min(int(limit), 100))
+
+    query = """
+    SELECT TOP @limit c.username, c.score, c.timestamp
+    FROM c
+    WHERE c.gameMode = @mode
+    ORDER BY c.score DESC, c.timestamp ASC
+    """
+
+    params = [
+        {"name": "@limit", "value": limit},
+        {"name": "@mode", "value": game_mode},
+    ]
+
+    items = list(
+        _container.query_items(
+            query=query,
+            parameters=params,
+            enable_cross_partition_query=True,
+        )
+    )
+    return items
