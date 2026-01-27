@@ -9,12 +9,10 @@ SQLALCHEMY_DATABASE_URL = os.getenv(
     "sqlite:///./users.db"
 )
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "dodgestorm")
-MONGO_LEADERBOARD_COLLECTION = os.getenv(
-    "MONGO_LEADERBOARD_COLLECTION",
-    "leaderboard_entries"
-)
+COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "")
+COSMOS_KEY = os.getenv("COSMOS_KEY", "")
+COSMOS_DB_NAME = os.getenv("COSMOS_DB_NAME", "LeaderboardDB")
+COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "Scores")
 
 CORS_ORIGINS = os.getenv(
     "CORS_ORIGINS",

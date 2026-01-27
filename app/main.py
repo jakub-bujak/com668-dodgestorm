@@ -1,6 +1,10 @@
 import asyncio
+import os
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .config import CORS_ORIGINS
@@ -13,9 +17,10 @@ from .ws import ws_manager
 
 app = FastAPI(title="DodgeStorm API")
 
+origins = [o.strip() for o in CORS_ORIGINS if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in CORS_ORIGINS if o.strip()],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,12 +28,23 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-app.include_router(leaderboard_router)
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 
 @app.get("/")
 def root():
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return {"status": "ok", "message": "API running (Unity build not found)"}
+
+
+@app.get("/health")
+def health():
     return {"status": "ok"}
+
+
+app.include_router(leaderboard_router)
 
 
 @app.post("/auth/register", response_model=AuthResponse)
@@ -53,10 +69,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     username = payload.username.strip()
 
     user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    if not verify_password(payload.password, user.password_hash):
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(user.user_id, user.username)
