@@ -4,8 +4,10 @@ from typing import Any, Dict, List
 from azure.cosmos import CosmosClient, PartitionKey
 from .config import COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DB_NAME, COSMOS_CONTAINER
 
-_client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
+if not COSMOS_ENDPOINT or not COSMOS_KEY:
+    raise RuntimeError("COSMOS_ENDPOINT / COSMOS_KEY not set")
 
+_client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
 _db = _client.create_database_if_not_exists(id=COSMOS_DB_NAME)
 
 _container = _db.create_container_if_not_exists(
@@ -34,11 +36,10 @@ def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]
         {"name": "@mode", "value": game_mode},
     ]
 
-    items = list(
+    return list(
         _container.query_items(
             query=query,
             parameters=params,
             enable_cross_partition_query=True,
         )
     )
-    return items

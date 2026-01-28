@@ -31,8 +31,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Base.metadata.create_all(bind=engine)
-
 if os.path.isdir(STATIC_DIR):
     build_dir = os.path.join(STATIC_DIR, "Build")
     templ_dir = os.path.join(STATIC_DIR, "TemplateData")
@@ -44,6 +42,8 @@ if os.path.isdir(STATIC_DIR):
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
+Base.metadata.create_all(bind=engine)
+
 @app.get("/")
 def root():
     if os.path.exists(UNITY_INDEX):
@@ -53,6 +53,11 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/debug/sql")
+def debug_sql(db: Session = Depends(get_db)):
+    count = db.query(User).count()
+    return {"ok": True, "user_count": count}
 
 app.include_router(leaderboard_router)
 
