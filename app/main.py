@@ -4,7 +4,7 @@ import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from .config import CORS_ORIGINS
@@ -24,7 +24,7 @@ UNITY_INDEX = os.path.join(STATIC_DIR, "index.html")
 origins = [o.strip() for o in CORS_ORIGINS if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,7 +38,7 @@ if os.path.isdir(STATIC_DIR):
 @app.get("/")
 def root():
     if os.path.exists(UNITY_INDEX):
-        return FileResponse(UNITY_INDEX)
+        return RedirectResponse(url="/static/index.html")
     return {"status": "ok", "message": "API running (Unity build not found)"}
 
 @app.get("/health")
@@ -80,10 +80,7 @@ def guest_login(db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
-        user = User(
-            username=username,
-            password_hash=hash_password("guest_placeholder_password")
-        )
+        user = User(username=username, password_hash=hash_password("guest_placeholder_password"))
         db.add(user)
         db.commit()
         db.refresh(user)
