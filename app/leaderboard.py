@@ -31,8 +31,8 @@ async def submit_score(
         raise HTTPException(status_code=400, detail="Score rejected (implausible)")
 
     doc = {
-        "userId": int(user.user_id),
-        "username": user.username,
+        "userId": int(user.UserId),
+        "username": user.Username,
         "score": int(payload.score),
         "durationSeconds": float(payload.durationSeconds),
         "timestamp": now_iso(),

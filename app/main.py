@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .config import CORS_ORIGINS
 from .sql_db import Base, engine, get_db
+from .nosql_db import get_top, insert_score
 from .models import User
 from .schemas import RegisterRequest, LoginRequest, AuthResponse
 from .auth import hash_password, verify_password, create_access_token
@@ -68,6 +69,12 @@ def health():
 def debug_sql(db: Session = Depends(get_db)):
     count = db.query(User).count()
     return {"ok": True, "user_count": count}
+
+
+@app.get("/debug/cosmos")
+def debug_cosmos():
+    items = get_top(limit=5, game_mode="classic")
+    return {"ok": True, "count": len(items), "items": items[:2]}
 
 
 app.include_router(leaderboard_router)
