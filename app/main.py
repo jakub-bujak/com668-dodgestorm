@@ -17,6 +17,10 @@ from .ws import ws_manager
 
 app = FastAPI(title="DodgeStorm API")
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(APP_DIR, "static")
+UNITY_INDEX = os.path.join(STATIC_DIR, "index.html")
+
 origins = [o.strip() for o in CORS_ORIGINS if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -28,24 +32,20 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static", html=True), name="static")
-
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 @app.get("/")
 def root():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
+    if os.path.exists(UNITY_INDEX):
+        return FileResponse(UNITY_INDEX)
     return {"status": "ok", "message": "API running (Unity build not found)"}
-
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-
 app.include_router(leaderboard_router)
-
 
 @app.post("/auth/register", response_model=AuthResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
@@ -63,7 +63,6 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     token = create_access_token(user.user_id, user.username)
     return AuthResponse(token=token, username=user.username, user_id=user.user_id)
 
-
 @app.post("/auth/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     username = payload.username.strip()
@@ -74,7 +73,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(user.user_id, user.username)
     return AuthResponse(token=token, username=user.username, user_id=user.user_id)
-
 
 @app.post("/auth/guest", response_model=AuthResponse)
 def guest_login(db: Session = Depends(get_db)):
@@ -92,7 +90,6 @@ def guest_login(db: Session = Depends(get_db)):
 
     token = create_access_token(user.user_id, user.username)
     return AuthResponse(token=token, username=user.username, user_id=user.user_id)
-
 
 @app.websocket("/ws/leaderboard")
 async def leaderboard_ws(websocket: WebSocket):
