@@ -45,7 +45,7 @@ def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]
     SELECT c.username, c.score, c.timestamp
     FROM c
     WHERE c.gameMode = @mode
-    ORDER BY c.score DESC, c.timestamp ASC
+    ORDER BY c.score DESC
     OFFSET 0 LIMIT @limit
     """
 
