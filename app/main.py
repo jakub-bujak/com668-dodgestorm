@@ -35,12 +35,13 @@ if os.path.isdir(STATIC_DIR):
     build_dir = os.path.join(STATIC_DIR, "Build")
     templ_dir = os.path.join(STATIC_DIR, "TemplateData")
 
+    app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+
     if os.path.isdir(build_dir):
         app.mount("/Build", StaticFiles(directory=build_dir), name="Build")
     if os.path.isdir(templ_dir):
         app.mount("/TemplateData", StaticFiles(directory=templ_dir), name="TemplateData")
 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 @app.on_event("startup")
 def on_startup():
@@ -48,8 +49,8 @@ def on_startup():
         Base.metadata.create_all(bind=engine)
         print("DB init OK")
     except Exception as e:
-        # Don't crash the whole API
         print("DB init FAILED:", repr(e))
+
 
 @app.get("/")
 def root():
@@ -57,52 +58,68 @@ def root():
         return FileResponse(UNITY_INDEX)
     return {"status": "ok", "message": "API running (Unity build not found)"}
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/debug/sql")
 def debug_sql(db: Session = Depends(get_db)):
     count = db.query(User).count()
     return {"ok": True, "user_count": count}
 
+
 app.include_router(leaderboard_router)
+
 
 @app.post("/auth/register", response_model=AuthResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     username = payload.username.strip()
-    existing = db.query(User).filter(User.username == username).first()
+
+    existing = db.query(User).filter(User.Username == username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    user = User(username=username, password_hash=hash_password(payload.password))
+    user = User(
+        Username=username,
+        PasswordHash=hash_password(payload.password),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.user_id, user.username)
-    return AuthResponse(token=token, username=user.username, user_id=user.user_id)
+    token = create_access_token(user.UserId, user.Username)
+    return AuthResponse(token=token, username=user.Username, user_id=user.UserId)
+
 
 @app.post("/auth/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     username = payload.username.strip()
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+
+    user = db.query(User).filter(User.Username == username).first()
+    if not user or not verify_password(payload.password, user.PasswordHash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token(user.user_id, user.username)
-    return AuthResponse(token=token, username=user.username, user_id=user.user_id)
+    token = create_access_token(user.UserId, user.Username)
+    return AuthResponse(token=token, username=user.Username, user_id=user.UserId)
+
 
 @app.post("/auth/guest", response_model=AuthResponse)
 def guest_login(db: Session = Depends(get_db)):
     username = f"Guest_{secrets.token_hex(4)}"
-    user = User(username=username, password_hash=hash_password(secrets.token_urlsafe(12)))
+
+    user = User(
+        Username=username,
+        PasswordHash=hash_password(secrets.token_urlsafe(12)),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.user_id, user.username)
-    return AuthResponse(token=token, username=user.username, user_id=user.user_id)
+    token = create_access_token(user.UserId, user.Username)
+    return AuthResponse(token=token, username=user.Username, user_id=user.UserId)
+
 
 @app.websocket("/ws/leaderboard")
 async def leaderboard_ws(websocket: WebSocket):
