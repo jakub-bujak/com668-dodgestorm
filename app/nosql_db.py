@@ -40,9 +40,10 @@ def insert_score(doc: Dict[str, Any]) -> None:
 
 def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]]:
     limit = max(1, min(int(limit), 100))
+    fetch_limit = max(100, min(limit * 25, 1000))
 
     query = """
-    SELECT c.username, c.score, c.timestamp
+    SELECT c.userId, c.username, c.score, c.timestamp
     FROM c
     WHERE c.gameMode = @mode
     ORDER BY c.score DESC
@@ -51,11 +52,11 @@ def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]
 
     params = [
         {"name": "@mode", "value": game_mode},
-        {"name": "@limit", "value": limit},
+        {"name": "@limit", "value": fetch_limit},
     ]
 
     try:
-        return list(
+        rows = list(
             _container.query_items(
                 query=query,
                 parameters=params,
@@ -65,3 +66,42 @@ def get_top(limit: int = 100, game_mode: str = "classic") -> List[Dict[str, Any]
     except CosmosHttpResponseError as e:
         log.exception("Cosmos get_top failed: %s", str(e))
         raise
+
+    best_by_user: Dict[int, Dict[str, Any]] = {}
+
+    for r in rows:
+        uid = r.get("userId")
+        if uid is None:
+            continue
+        try:
+            uid_int = int(uid)
+        except Exception:
+            continue
+
+        score = int(r.get("score", 0) or 0)
+        ts = r.get("timestamp") or ""
+
+        prev = best_by_user.get(uid_int)
+        if prev is None:
+            best_by_user[uid_int] = {
+                "userId": uid_int,
+                "username": r.get("username") or "",
+                "score": score,
+                "timestamp": ts,
+            }
+            continue
+
+        prev_score = int(prev.get("score", 0) or 0)
+        prev_ts = prev.get("timestamp") or ""
+
+        if score > prev_score or (score == prev_score and ts < prev_ts):
+            best_by_user[uid_int] = {
+                "userId": uid_int,
+                "username": r.get("username") or prev.get("username") or "",
+                "score": score,
+                "timestamp": ts,
+            }
+
+    unique = list(best_by_user.values())
+    unique.sort(key=lambda x: (-int(x.get("score", 0) or 0), str(x.get("timestamp") or "")))
+    return unique[:limit]
