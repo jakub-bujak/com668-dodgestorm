@@ -42,7 +42,14 @@ if os.path.isdir(STATIC_DIR):
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
-Base.metadata.create_all(bind=engine)
+@app.on_event("startup")
+def on_startup():
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("DB init OK")
+    except Exception as e:
+        # Don't crash the whole API
+        print("DB init FAILED:", repr(e))
 
 @app.get("/")
 def root():
