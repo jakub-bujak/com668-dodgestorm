@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from azure.cosmos.exceptions import CosmosHttpResponseError
 
 from .config import CORS_ORIGINS
 from .sql_db import Base, engine, get_db
@@ -73,8 +74,17 @@ def debug_sql(db: Session = Depends(get_db)):
 
 @app.get("/debug/cosmos")
 def debug_cosmos():
-    items = get_top(limit=5, game_mode="classic")
-    return {"ok": True, "count": len(items), "items": items[:2]}
+    try:
+        items = get_top(limit=5, game_mode="classic")
+        return {"ok": True, "count": len(items), "items": items[:2]}
+    except CosmosHttpResponseError as e:
+        return {
+            "ok": False,
+            "cosmos_status": getattr(e, "status_code", None),
+            "message": str(e),
+        }
+    except Exception as e:
+        return {"ok": False, "message": repr(e)}
 
 
 app.include_router(leaderboard_router)
